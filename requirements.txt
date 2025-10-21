@@ -1,0 +1,7 @@
+streamlit
+pandas
+numpy
+opencv-python-headless
+scikit-image
+matplotlib
+scikit-learn # Asumiendo que usaste K-Means para color, si no la usaste, puedes borrar esta línea.
