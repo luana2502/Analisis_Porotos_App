@@ -15,19 +15,18 @@ import cv2
 import matplotlib.pyplot as plt
 import streamlit as st
 from skimage.measure import label, regionprops
-# from skimage.morphology import convex_hull_image # Ya no se usa, pero lo dejo si lo necesitas
+# from skimage.morphology import convex_hull_image 
 
 # -----------------------------
 # Config general de la página
 # -----------------------------
 st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
 st.title("🌱 Análisis morfológico de porotos")
-st.markdown("Subí una imagen con **fondo azul** y ajustá los parámetros. El pipeline segmenta, mide y calcula color por poroto.")
+st.markdown("Selecciona el modo de operación. El análisis en tiempo real segmenta, mide y calcula color por poroto.")
 
 # -----------------------------
 # Rutas de Archivos de Demostración
 # -----------------------------
-# Asegúrate que el formato de imagen sea correcto (.jpg o .png, según subiste)
 DEMO_OVERLAY_PATH = "data/demo_overlay.jpg" 
 DEMO_RESULTS_PATH = "data/demo_results.csv"
 
@@ -192,7 +191,6 @@ def medir_porotos(img_bgr, mask_bin,
 
         # K-Means (opcional)
         if calcular_kmeans:
-            # Importación local para evitar dependencia si no se usa
             from sklearn.cluster import KMeans 
             roi = img_bgr[minr:maxr, minc:maxc]
             roi_mask = mask_bool[minr:maxr, minc:maxc]
@@ -202,7 +200,6 @@ def medir_porotos(img_bgr, mask_bin,
                     rng = np.random.default_rng(random_state + idx)
                     sel = rng.choice(len(pix), kmeans_sample_max, replace=False)
                     pix = pix[sel]
-                # Ajuste de n_init para scikit-learn >= 1.2
                 km = KMeans(n_clusters=k, random_state=random_state, n_init='auto', max_iter=300).fit(pix)
                 centers = km.cluster_centers_.astype(np.uint8)
                 counts  = np.bincount(km.labels_, minlength=k)
@@ -271,7 +268,7 @@ k_sample_max  = st.sidebar.number_input("Muestreo máx. (pix por poroto)", 1000,
 # ===========================================
 tab1, tab2 = st.tabs(["📊 1. Resultados de Colab (Demo)", "👆 2. Subir Mi Propia Imagen"])
 
-# Inicializa 'up' a None para que el código de análisis se ejecute condicionalmente
+# Inicializa 'up' a None. Se redefinirá en tab2 si el usuario interactúa.
 up = None 
 
 # -------------------------------------------
@@ -286,7 +283,6 @@ with tab1:
         
         with col_img:
             st.subheader("Visualización Final del Proceso")
-            # Carga la imagen de overlay (jpg o png)
             st.image(DEMO_OVERLAY_PATH, 
                      caption=f"Imagen con segmentación, medidas y etiquetas superpuestas (Fuente: {os.path.basename(DEMO_OVERLAY_PATH)})", 
                      use_column_width=True)
@@ -311,22 +307,29 @@ with tab1:
         st.error("⚠️ Archivos de demostración no encontrados.")
         st.caption(f"Asegúrate de haber subido **{os.path.basename(DEMO_OVERLAY_PATH)}** y **{os.path.basename(DEMO_RESULTS_PATH)}** a la carpeta **'data/'** de tu repositorio de GitHub.")
     
-    st.stop() # CRÍTICO: Detiene la ejecución en la pestaña de Demo para no intentar cargar una imagen
+    # IMPORTANTE: Eliminamos el st.stop() de aquí para que el script continúe a tab2.
 
 # -------------------------------------------
 # PESTAÑA 2: CARGA DEL USUARIO (Lógica Original Adaptada)
 # -------------------------------------------
 with tab2:
     st.subheader("Sube tu propia imagen para análisis en tiempo real")
-    # Redefinimos 'up' DENTRO de la pestaña del usuario.
+    # Al estar dentro del bloque 'with tab2', este uploader solo es visible en esta pestaña.
     up = st.file_uploader("Subí una imagen con fondo azul (JPG/PNG/TIF)", type=["jpg","jpeg","png","tif","tiff"])
-    
-# Si el usuario no ha subido nada en la PESTAÑA 2, detenemos la ejecución del análisis
+
+# ===========================================
+# CONTROL DE FLUJO Y ANÁLISIS
+# ===========================================
+
+# Si 'up' es None, significa que el usuario está en tab2 y no ha subido una imagen (o está en tab1).
+# Detenemos la ejecución de las secciones de análisis (2, 3, 4).
 if up is None:
-    st.info("Esperando imagen del usuario…")
-    st.stop()
-    
-# Si llegamos aquí, 'up' tiene una imagen válida de la PESTAÑA 2
+    # Usamos st.empty() para poner un mensaje en la pestaña activa (tab2, si el usuario la seleccionó)
+    if not os.path.exists(DEMO_OVERLAY_PATH) and not os.path.exists(DEMO_RESULTS_PATH):
+         st.warning("Selecciona una imagen en la pestaña 2 para continuar con el análisis.")
+    st.stop() # Detenemos la ejecución aquí si no hay archivo
+
+# Si llegamos aquí, 'up' tiene una imagen válida y podemos procesarla.
 file_bytes = np.asarray(bytearray(up.read()), dtype=np.uint8)
 img_bgr = cv2.imdecode(file_bytes, 1)
 if img_bgr is None:
@@ -408,7 +411,6 @@ if df_km is not None and not df_km.empty:
         patch = np.zeros((40, width, 3), dtype=np.uint8)
         start = 0
         for _, row in sub.iterrows():
-            # R, G, B están en el DataFrame, pero deben ser extraídos como enteros
             r, g, b = int(row["R"]), int(row["G"]), int(row["B"])
             w = int(width * float(row["proportion"]))
             patch[:, start:start+w, :] = [r, g, b] 
@@ -437,7 +439,7 @@ st.markdown("""
 - **eje_menor_mm (W)**: longitud del eje menor del elipse equivalente (mm).
 - **circularidad**: \\( 4\\pi A / P^2 \\). Cercano a 1 indica formas más redondeadas.
 - **R,G,B**: color promedio del poroto en RGB (0–255).
-- **H,S,V**: color promedio en HSV (OpenCV: **H∈[0,179]**, **S,V∈[0,255]**).
+- **H,S,V**: color promedio en HSV (OpenCV: **H∈[0,179]**, **S,V∈[255]**).
 - **cluster_rank** (K-Means): 1 = color más predominante del poroto.
 - **proportion** (K-Means): fracción del poroto representada por cada cluster.
 
