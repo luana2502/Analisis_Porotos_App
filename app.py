@@ -15,14 +15,21 @@ import cv2
 import matplotlib.pyplot as plt
 import streamlit as st
 from skimage.measure import label, regionprops
-from skimage.morphology import convex_hull_image
+# from skimage.morphology import convex_hull_image # Ya no se usa, pero lo dejo si lo necesitas
 
 # -----------------------------
 # Config general de la página
 # -----------------------------
 st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
-st.title("Análisis morfológico de porotos")
+st.title("🌱 Análisis morfológico de porotos")
 st.markdown("Subí una imagen con **fondo azul** y ajustá los parámetros. El pipeline segmenta, mide y calcula color por poroto.")
+
+# -----------------------------
+# Rutas de Archivos de Demostración
+# -----------------------------
+# Asegúrate que el formato de imagen sea correcto (.jpg o .png, según subiste)
+DEMO_OVERLAY_PATH = "data/demo_overlay.jpg" 
+DEMO_RESULTS_PATH = "data/demo_results.csv"
 
 # -----------------------------
 # Utilidades
@@ -62,10 +69,7 @@ def regiones_validas_ordenadas(mask_bin: np.ndarray,
 def _place_text_inside(ax, bbox, texto, img_w, img_h,
                        label_w_px=160, label_h_px=78, margin=5):
     """
-    Coloca el texto dentro del área visible:
-    - si no entra a la derecha, lo alinea a la derecha del bbox
-    - si no entra abajo, lo alinea al borde inferior del bbox
-    Usa clip_on=True para no dibujar fuera de los ejes.
+    Coloca el texto dentro del área visible.
     """
     minr, minc, maxr, maxc = bbox
 
@@ -148,11 +152,11 @@ def medir_porotos(img_bgr, mask_bin,
         per_px  = float(r.perimeter)
         maj_px  = max(float(r.major_axis_length), 1e-6)
         min_px  = max(float(r.minor_axis_length), 1e-6)
-        cy_px, cx_px = r.centroid
+        # cy_px, cx_px = r.centroid
 
         # Conversión a mm
-        area_mm2     = area_px * px2_to_mm2
-        per_mm       = per_px  * px_to_mm
+        area_mm2       = area_px * px2_to_mm2
+        per_mm         = per_px  * px_to_mm
         eje_mayor_mm = maj_px  * px_to_mm
         eje_menor_mm = min_px  * px_to_mm
 
@@ -188,7 +192,8 @@ def medir_porotos(img_bgr, mask_bin,
 
         # K-Means (opcional)
         if calcular_kmeans:
-            from sklearn.cluster import KMeans
+            # Importación local para evitar dependencia si no se usa
+            from sklearn.cluster import KMeans 
             roi = img_bgr[minr:maxr, minc:maxc]
             roi_mask = mask_bool[minr:maxr, minc:maxc]
             pix = roi[roi_mask].reshape(-1, 3)  # BGR
@@ -197,7 +202,8 @@ def medir_porotos(img_bgr, mask_bin,
                     rng = np.random.default_rng(random_state + idx)
                     sel = rng.choice(len(pix), kmeans_sample_max, replace=False)
                     pix = pix[sel]
-                km = KMeans(n_clusters=k, random_state=random_state, n_init=10, max_iter=300).fit(pix)
+                # Ajuste de n_init para scikit-learn >= 1.2
+                km = KMeans(n_clusters=k, random_state=random_state, n_init='auto', max_iter=300).fit(pix)
                 centers = km.cluster_centers_.astype(np.uint8)
                 counts  = np.bincount(km.labels_, minlength=k)
                 props   = counts / counts.sum()
@@ -216,7 +222,7 @@ def medir_porotos(img_bgr, mask_bin,
 
         # Dibujo: bbox y texto (A/P/L/W)
         ax.add_patch(plt.Rectangle((minc, minr), (maxc - minc), (maxr - minr),
-                                   edgecolor="lime", linewidth=2.0, fill=False))
+                                    edgecolor="lime", linewidth=2.0, fill=False))
         txt = (f"{idx}\n"
                f"A:{area_mm2:.1f} mm²\n"
                f"P:{per_mm:.1f} mm\n"
@@ -261,14 +267,66 @@ k_clusters    = st.sidebar.slider("k clusters", 2, 5, 3)
 k_sample_max  = st.sidebar.number_input("Muestreo máx. (pix por poroto)", 1000, 200000, 15000, step=1000)
 
 # ===========================================
-# 1) Cargar imagen
+# 1) MODO DE OPERACIÓN (Demo vs. Usuario)
 # ===========================================
-st.subheader("1) Cargar imagen")
-up = st.file_uploader("Subí una imagen con fondo azul (JPG/PNG/TIF)", type=["jpg","jpeg","png","tif","tiff"])
-if up is None:
-    st.info("Esperando imagen…")
-    st.stop()
+tab1, tab2 = st.tabs(["📊 1. Resultados de Colab (Demo)", "👆 2. Subir Mi Propia Imagen"])
 
+# Inicializa 'up' a None para que el código de análisis se ejecute condicionalmente
+up = None 
+
+# -------------------------------------------
+# PESTAÑA 1: RESULTADOS DE EJEMPLO DE COLAB
+# -------------------------------------------
+with tab1:
+    st.header("Resultados de la Investigación de Ejemplo")
+    st.markdown("Estos son los datos e imágenes generados en Google Colab para demostrar el *pipeline* completo. Puedes explorar las medidas y visualizaciones finales.")
+    
+    try:
+        col_img, col_data = st.columns([2, 3])
+        
+        with col_img:
+            st.subheader("Visualización Final del Proceso")
+            # Carga la imagen de overlay (jpg o png)
+            st.image(DEMO_OVERLAY_PATH, 
+                     caption=f"Imagen con segmentación, medidas y etiquetas superpuestas (Fuente: {os.path.basename(DEMO_OVERLAY_PATH)})", 
+                     use_column_width=True)
+        
+        with col_data:
+            st.subheader("Tabla de Medidas Generadas")
+            df_demo = pd.read_csv(DEMO_RESULTS_PATH)
+            
+            # Mostrar solo las columnas clave y redondear
+            cols_to_show = [c for c in ["id_poroto", "area_mm2", "circularidad", "R", "G", "B"] if c in df_demo.columns]
+            st.dataframe(df_demo[cols_to_show].round(2), use_container_width=True)
+            
+            # Botón de descarga de los datos brutos del demo
+            csv_demo = df_demo.to_csv(index=False).encode('utf-8')
+            st.download_button("⬇️ Descargar Datos de Colab (CSV)",
+                               data=csv_demo,
+                               file_name="demo_resultados_colab.csv",
+                               mime='text/csv')
+            
+
+    except FileNotFoundError:
+        st.error("⚠️ Archivos de demostración no encontrados.")
+        st.caption(f"Asegúrate de haber subido **{os.path.basename(DEMO_OVERLAY_PATH)}** y **{os.path.basename(DEMO_RESULTS_PATH)}** a la carpeta **'data/'** de tu repositorio de GitHub.")
+    
+    st.stop() # CRÍTICO: Detiene la ejecución en la pestaña de Demo para no intentar cargar una imagen
+
+# -------------------------------------------
+# PESTAÑA 2: CARGA DEL USUARIO (Lógica Original Adaptada)
+# -------------------------------------------
+with tab2:
+    st.subheader("Sube tu propia imagen para análisis en tiempo real")
+    # Redefinimos 'up' DENTRO de la pestaña del usuario.
+    up = st.file_uploader("Subí una imagen con fondo azul (JPG/PNG/TIF)", type=["jpg","jpeg","png","tif","tiff"])
+    
+# Si el usuario no ha subido nada en la PESTAÑA 2, detenemos la ejecución del análisis
+if up is None:
+    st.info("Esperando imagen del usuario…")
+    st.stop()
+    
+# Si llegamos aquí, 'up' tiene una imagen válida de la PESTAÑA 2
 file_bytes = np.asarray(bytearray(up.read()), dtype=np.uint8)
 img_bgr = cv2.imdecode(file_bytes, 1)
 if img_bgr is None:
@@ -315,9 +373,9 @@ with col2:
 
     csv_med = df_med[cols_basic].to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Descargar tabla (CSV)",
-                       data=csv_med,
-                       file_name=f"medidas_{os.path.splitext(up.name)[0]}.csv",
-                       mime="text/csv")
+                        data=csv_med,
+                        file_name=f"medidas_{os.path.splitext(up.name)[0]}.csv",
+                        mime="text/csv")
 
 # ===========================================
 # 4) Color
@@ -331,16 +389,16 @@ if do_color_prom and {"R","G","B","H","S","V"}.issubset(df_med.columns):
 
     csv_color = df_color.to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Descargar color promedio (CSV)",
-                       data=csv_color,
-                       file_name=f"color_promedio_{os.path.splitext(up.name)[0]}.csv",
-                       mime="text/csv")
+                        data=csv_color,
+                        file_name=f"color_promedio_{os.path.splitext(up.name)[0]}.csv",
+                        mime="text/csv")
 else:
     st.caption("Activa “Color promedio (RGB/HSV)” en la barra lateral para ver esta tabla.")
 
 if df_km is not None and not df_km.empty:
     st.markdown("**Colores dominantes por poroto (K-Means)** — `cluster_rank=1` es el más predominante.")
     st.dataframe(df_km[["id_poroto","cluster_rank","proportion","R","G","B","H","S","V"]].round(3),
-                 use_container_width=True)
+                    use_container_width=True)
 
     # Parches proporcionales por poroto
     st.markdown("**Parches proporcionales**")
@@ -350,16 +408,18 @@ if df_km is not None and not df_km.empty:
         patch = np.zeros((40, width, 3), dtype=np.uint8)
         start = 0
         for _, row in sub.iterrows():
+            # R, G, B están en el DataFrame, pero deben ser extraídos como enteros
+            r, g, b = int(row["R"]), int(row["G"]), int(row["B"])
             w = int(width * float(row["proportion"]))
-            patch[:, start:start+w, :] = [int(row["R"]), int(row["G"]), int(row["B"])]
+            patch[:, start:start+w, :] = [r, g, b] 
             start += w
         st.image(patch, caption=f"Poroto {pid} — mezcla por proporción", use_container_width=False)
 
     csv_km = df_km.to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Descargar K-Means (CSV)",
-                       data=csv_km,
-                       file_name=f"kmeans_{os.path.splitext(up.name)[0]}.csv",
-                       mime="text/csv")
+                        data=csv_km,
+                        file_name=f"kmeans_{os.path.splitext(up.name)[0]}.csv",
+                        mime="text/csv")
 else:
     st.caption("Podés habilitar K-Means en la barra lateral (puede tardar en imágenes grandes).")
 
