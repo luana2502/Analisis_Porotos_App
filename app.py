@@ -21,7 +21,7 @@ from skimage.morphology import convex_hull_image
 # Config general de la página
 # -----------------------------
 st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
-st.title("🌱 Análisis morfológico y de color de porotos")
+st.title("Análisis morfológico de porotos")
 st.markdown("Subí una imagen con **fondo azul** y ajustá los parámetros. El pipeline segmenta, mide y calcula color por poroto.")
 
 # -----------------------------
