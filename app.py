@@ -1,6 +1,8 @@
 # app.py
 # ===========================================
-# UI de Streamlit para análisis de porotos
+# Análisis morfológico de porotos
+# Herramienta desarrollada en el marco de una
+# Beca de Iniciación a la Investigación – UTEC
 # ===========================================
 
 import os, math
@@ -11,163 +13,69 @@ import matplotlib.pyplot as plt
 import streamlit as st
 from skimage.measure import label, regionprops
 
-# -----------------------------
-# Configuración general
-# -----------------------------
-st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
+# ===========================================
+# CONFIGURACIÓN GENERAL
+# ===========================================
+st.set_page_config(
+    page_title="Análisis morfológico de porotos",
+    layout="wide"
+)
 
-# -----------------------------
-# Logos institucionales (carpeta data/)
-# -----------------------------
-logo_utec  = "data/06-isologotipo-para-fondo-blanco.png"
-logo_aria  = "data/Color.png"
-logo_gasma = "data/Imagen de WhatsApp 2024-06-05 a las 20.20.39.png"
+# ===========================================
+# LOGOS (GitHub friendly)
+# ===========================================
+col_logo1, col_logo2, col_logo3 = st.columns([1, 1, 1])
+with col_logo1:
+    st.image("data/logo_utec.png", use_container_width=True)
+with col_logo2:
+    st.image("data/logo_aria.png", use_container_width=True)
+with col_logo3:
+    st.image("data/logo_gasma.jpg", use_container_width=True)
 
-c1, c2, c3 = st.columns([1, 1, 1])
-with c1:
-    if os.path.exists(logo_utec):
-        st.image(logo_utec, use_container_width=True)
-with c2:
-    if os.path.exists(logo_aria):
-        st.image(logo_aria, use_container_width=True)
-with c3:
-    if os.path.exists(logo_gasma):
-        st.image(logo_gasma, use_container_width=True)
+st.title("🌱 Análisis morfológico de porotos")
 
-# -----------------------------
-# Título
-# -----------------------------
-st.title("🌱 Análisis morfológico y cromático de porotos")
+# ===========================================
+# TABS PRINCIPALES
+# ===========================================
+tab_demo, tab_upload, tab_about = st.tabs([
+    "📊 Ejemplo de resultado obtenido",
+    "👆 Subir mi propia imagen",
+    "ℹ️ Acerca de la herramienta"
+])
 
-# -----------------------------
-# ¿Qué hace la herramienta?
-# -----------------------------
-st.markdown("""
----
-## 📌 ¿Qué hace esta herramienta?
-
-Esta aplicación permite realizar el **análisis morfológico y cromático de porotos (Phaseolus spp.)**
-a partir de imágenes digitales, utilizando técnicas de **visión por computadora**.
-
-La herramienta realiza automáticamente:
-
-- Segmentación de porotos sobre fondo azul  
-- Medición morfológica en milímetros (área, perímetro, ejes mayor y menor, circularidad)  
-- Cálculo de color promedio (RGB y HSV)  
-- Identificación opcional de colores dominantes mediante **K-Means**  
-- Exportación de resultados en formato **CSV**
-
-Está diseñada como apoyo a tareas de **caracterización fenotípica**, análisis de semillas
-y estudios no destructivos.
-""")
-
-# -----------------------------
-# Marco institucional
-# -----------------------------
-st.markdown("""
----
-## 🎓 Marco institucional y financiamiento
-
-Esta herramienta fue desarrollada en el marco de una **Beca de Iniciación a la Investigación**,
-financiada por la **Dirección de Investigación y Desarrollo de la Universidad Tecnológica del Uruguay (UTEC)**.
-
-### Tutoría académica
-- **Nelcy Atehortua**
-- **Daniel Bueno**
-- **Natalia De Almeida**
-
-### Grupos de investigación involucrados
-- **Grupo de Agroecología y Medio Ambiente (GASMA)**
-- **Grupo de Investigación en Aplicaciones en Inteligencia Artificial (ARIA)**
-""")
-
-# -----------------------------
-# Requisitos de las imágenes
-# -----------------------------
-st.markdown("""
----
-## ⚠️ Requisitos obligatorios de las imágenes
-
-⚠️ **La herramienta funciona únicamente con imágenes que cumplan TODAS las siguientes condiciones:**
-
-- 📸 Capturadas con **escáner Epson Perfection V850 PRO**
-- 🔵 Fondo **azul uniforme**
-- 🖼️ Porotos separados entre sí (sin superposición)
-- 📁 Formatos admitidos: JPG, PNG, TIF / TIFF
-- 🖨️ Resolución coherente con el **DPI configurado**
-
-El uso de imágenes que no cumplan estos requisitos puede generar errores en la segmentación
-y en las mediciones morfológicas.
-""")
-
-# -----------------------------
-# Instructivo de uso
-# -----------------------------
-st.markdown("""
----
-## 🧭 Instructivo de uso
-
-### Paso 1 – Subir imagen
-Ir a la pestaña **“Subir mi propia imagen”** y cargar una imagen con fondo azul.
-
-### Paso 2 – Ajustar parámetros
-Configurar los parámetros desde la **barra lateral derecha** según la imagen.
-
-### Paso 3 – Segmentación
-La aplicación separa automáticamente los porotos del fondo azul utilizando el espacio de color HSV.
-
-### Paso 4 – Medición
-Se calculan las variables morfológicas en milímetros usando el DPI indicado.
-
-### Paso 5 – Resultados
-- Visualización de porotos detectados
-- Tablas descargables en CSV
-- Análisis de color promedio y colores dominantes (opcional)
-""")
-
-# -----------------------------
-# Explicación de parámetros
-# -----------------------------
-st.markdown("""
----
-## ⚙️ Explicación de los parámetros
-
-### 🖨️ DPI (escáner)
-Define la resolución de la imagen y permite convertir píxeles a milímetros.
-
-### 📏 Área mínima (px²)
-Elimina objetos pequeños que no corresponden a porotos (ruido).
-
-### 🧱 Borde
-- **Excluir objetos cerca del borde**: descarta porotos cortados por el marco.
-- **Margen de borde**: distancia en píxeles desde el borde que será ignorada.
-
-### 🎨 Segmentación HSV (fondo azul)
-Define el rango de color azul que será identificado como fondo.
-- **H**: tono
-- **S**: saturación
-- **V**: brillo
-
-### 🧩 Morfología
-- **Kernel**: tamaño del elemento estructurante.
-- **Cierre**: rellena huecos internos.
-- **Apertura**: elimina ruido pequeño.
-
-### 🌈 Color
-- **Color promedio**: calcula RGB y HSV por poroto.
-- **K-Means**: identifica colores dominantes dentro de cada poroto.
-""")
-
-# ======================================================
-# A PARTIR DE AQUÍ: TU PIPELINE ORIGINAL (SIN CAMBIOS)
-# ======================================================
-
+# ===========================================
+# RUTAS DEMO
+# ===========================================
 DEMO_OVERLAY_PATH = "data/demo_overlay.jpg"
 DEMO_RESULTS_PATH = "data/demo_results.csv"
 
+# ===========================================
+# UTILIDADES
+# ===========================================
 def bgr2rgb(img):
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+
+def regiones_validas_ordenadas(mask_bin, area_min=1000, excluir_borde=True, margen_borde_px=20):
+    lab = label(mask_bin > 0)
+    regs0 = regionprops(lab)
+    h, w = lab.shape
+    regs = []
+    for r in regs0:
+        if r.area < area_min:
+            continue
+        minr, minc, maxr, maxc = r.bbox
+        if excluir_borde:
+            if minr < margen_borde_px or minc < margen_borde_px or maxr > h-margen_borde_px or maxc > w-margen_borde_px:
+                continue
+        regs.append(r)
+    regs.sort(key=lambda r: (r.centroid[1], r.centroid[0]))
+    return lab, regs
+
+
+# ===========================================
+# SEGMENTACIÓN HSV (FONDO AZUL)
+# ===========================================
 def segmentar_porotos(img_bgr, azul_bajo, azul_alto, kernel_size, close_iters, open_iters):
     hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
     mask_bg = cv2.inRange(hsv, np.array(azul_bajo), np.array(azul_alto))
@@ -177,14 +85,50 @@ def segmentar_porotos(img_bgr, azul_bajo, azul_alto, kernel_size, close_iters, o
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k, iterations=open_iters)
     return mask
 
-# -----------------------------
-# Sidebar
-# -----------------------------
-st.sidebar.header("Parámetros")
-dpi = st.sidebar.number_input("DPI (escáner)", 100, 2400, 800, step=50)
-area_min = st.sidebar.number_input("Área mínima (px²)", 10, 1_000_000, 1000, step=50)
 
-st.sidebar.subheader("Borde")
+# ===========================================
+# MEDICIÓN
+# ===========================================
+def medir_porotos(img_bgr, mask_bin, dpi, area_min, descartar_borde, margen_borde_px):
+    px_to_mm = 25.4 / dpi
+    px2_to_mm2 = px_to_mm ** 2
+    labels, regs = regiones_validas_ordenadas(mask_bin, area_min, descartar_borde, margen_borde_px)
+
+    filas = []
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.imshow(bgr2rgb(img_bgr)); ax.axis("off")
+
+    for idx, r in enumerate(regs, start=1):
+        minr, minc, maxr, maxc = r.bbox
+        area_mm2 = r.area * px2_to_mm2
+        per_mm = r.perimeter * px_to_mm
+        eje_mayor_mm = r.major_axis_length * px_to_mm
+        eje_menor_mm = r.minor_axis_length * px_to_mm
+        circularidad = (4 * math.pi * r.area) / (r.perimeter ** 2 + 1e-12)
+
+        filas.append({
+            "id_poroto": idx,
+            "area_mm2": area_mm2,
+            "perimetro_mm": per_mm,
+            "eje_mayor_mm": eje_mayor_mm,
+            "eje_menor_mm": eje_menor_mm,
+            "circularidad": circularidad
+        })
+
+        ax.add_patch(plt.Rectangle((minc, minr), maxc-minc, maxr-minr, fill=False, edgecolor='lime', linewidth=2))
+        ax.text(minc, minr, str(idx), color='yellow', fontsize=12, weight='bold')
+
+    return pd.DataFrame(filas), fig
+
+
+# ===========================================
+# SIDEBAR – PARÁMETROS
+# ===========================================
+st.sidebar.header("Parámetros")
+
+dpi = st.sidebar.number_input("DPI del escáner", 300, 2400, 800, step=50)
+area_min = st.sidebar.number_input("Área mínima (px²)", 100, 1000000, 1000)
+
 descartar_borde = st.sidebar.checkbox("Excluir objetos cerca del borde", True)
 margen_borde_px = st.sidebar.slider("Margen de borde (px)", 0, 100, 20)
 
@@ -199,38 +143,102 @@ v_high = st.sidebar.slider("V max", 0, 255, 255)
 azul_bajo = (h_low, s_low, v_low)
 azul_alto = (h_high, s_high, v_high)
 
-st.sidebar.subheader("Morfología")
-kernel_size = st.sidebar.slider("Kernel (px)", 1, 15, 5, step=2)
+kernel_size = st.sidebar.slider("Kernel morfológico (px)", 1, 15, 5, step=2)
 close_iters = st.sidebar.slider("Cierre", 0, 5, 2)
-open_iters  = st.sidebar.slider("Apertura", 0, 5, 1)
+open_iters = st.sidebar.slider("Apertura", 0, 5, 1)
 
-st.sidebar.subheader("Color")
-do_color_prom = st.sidebar.checkbox("Color promedio (RGB/HSV)", True)
-do_kmeans = st.sidebar.checkbox("K-Means por poroto", False)
 
-# -----------------------------
-# Tabs
-# -----------------------------
-tab1, tab2 = st.tabs(["📊 Resultados demo", "👆 Subir mi propia imagen"])
+# ===========================================
+# TAB 1 – RESULTADOS DEMO
+# ===========================================
+with tab_demo:
+    st.subheader("Resultados obtenidos en la investigación")
 
-with tab2:
-    up = st.file_uploader(
-        "Subí una imagen capturada con escáner Epson Perfection V850 PRO y fondo azul",
-        type=["jpg", "jpeg", "png", "tif", "tiff"]
-    )
+    if os.path.exists(DEMO_OVERLAY_PATH):
+        st.image(DEMO_OVERLAY_PATH, caption="Imagen demo: segmentación y medición automática", use_container_width=True)
+    else:
+        st.warning("No se encontró la imagen demo.")
 
-if up is None:
-    st.info("Esperando imagen para iniciar el análisis.")
-    st.stop()
+    if os.path.exists(DEMO_RESULTS_PATH):
+        df_demo = pd.read_csv(DEMO_RESULTS_PATH)
+        st.dataframe(df_demo, use_container_width=True)
+        st.download_button(
+            "⬇️ Descargar CSV demo",
+            data=df_demo.to_csv(index=False).encode("utf-8"),
+            file_name="resultados_demo.csv",
+            mime="text/csv"
+        )
+    else:
+        st.warning("No se encontró el archivo CSV demo.")
 
-file_bytes = np.asarray(bytearray(up.read()), dtype=np.uint8)
-img_bgr = cv2.imdecode(file_bytes, 1)
 
-st.subheader("Segmentación")
-mask = segmentar_porotos(img_bgr, azul_bajo, azul_alto, kernel_size, close_iters, open_iters)
+# ===========================================
+# TAB 2 – SUBIR IMAGEN
+# ===========================================
+with tab_upload:
+    st.markdown("**⚠️ Esta herramienta funciona únicamente con imágenes capturadas con el escáner Epson Perfection V850 PRO y fondo azul uniforme.**")
 
-colA, colB = st.columns(2)
-with colA:
-    st.image(bgr2rgb(img_bgr), caption="Imagen original", use_container_width=True)
-with colB:
-    st.image(mask, caption="Máscara segmentada", use_container_width=True)
+    up = st.file_uploader("Subí tu imagen", type=["jpg", "jpeg", "png", "tif", "tiff"])
+
+    if up is None:
+        st.info("Esperando imagen para iniciar el análisis.")
+        st.stop()
+
+    file_bytes = np.asarray(bytearray(up.read()), dtype=np.uint8)
+    img_bgr = cv2.imdecode(file_bytes, 1)
+
+    mask = segmentar_porotos(img_bgr, azul_bajo, azul_alto, kernel_size, close_iters, open_iters)
+
+    colA, colB = st.columns(2)
+    with colA:
+        st.image(bgr2rgb(img_bgr), caption="Imagen original", use_container_width=True)
+    with colB:
+        st.image(mask, caption="Máscara segmentada", use_container_width=True)
+
+    df_med, fig = medir_porotos(img_bgr, mask, dpi, area_min, descartar_borde, margen_borde_px)
+
+    if df_med.empty:
+        st.warning("No se detectaron porotos válidos.")
+        st.stop()
+
+    st.pyplot(fig, use_container_width=True)
+    st.dataframe(df_med.round(2), use_container_width=True)
+
+
+# ===========================================
+# TAB 3 – ACERCA DE
+# ===========================================
+with tab_about:
+    st.markdown("""
+### ¿Qué hace esta herramienta?
+Esta aplicación permite la **segmentación automática, medición morfológica y análisis básico de color** de porotos a partir de imágenes escaneadas, proporcionando métricas objetivas y reproducibles para estudios de semillas.
+
+### Marco institucional
+Esta herramienta fue desarrollada en el marco de una **Beca de Iniciación a la Investigación**, financiada por la **Dirección de Investigación y Desarrollo de la Universidad Tecnológica del Uruguay (UTEC)**.
+
+### Tutoría
+- Nelcy Atehortua  
+- Daniel Bueno  
+- Natalia De Almeida
+
+### Grupos de investigación
+- **Grupo de Agroecología y Medio Ambiente (GASMA)**  
+- **Grupo de investigación en Aplicaciones en Inteligencia Artificial (ARIA)**
+
+### Instructivo de uso
+1. Escanear los porotos con **Epson Perfection V850 PRO**, resolución conocida (ej. 800 DPI).
+2. Utilizar **fondo azul uniforme**.
+3. Subir la imagen en la pestaña correspondiente.
+4. Ajustar parámetros de segmentación y morfología en la barra lateral.
+5. Descargar los resultados en formato CSV.
+
+### Parámetros (barra lateral)
+- **DPI**: convierte píxeles a milímetros.
+- **Área mínima**: elimina ruido.
+- **Margen de borde**: descarta objetos tocando el marco.
+- **HSV**: define el rango del fondo azul.
+- **Cierre / Apertura**: corrige huecos o ruido.
+
+---
+Desarrollado con fines académicos y de investigación.
+""")
