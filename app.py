@@ -35,12 +35,12 @@ with col_logo3:
 st.title("🌱 Análisis morfológico de porotos")
 
 # ===========================================
-# TABS PRINCIPALES
+# TABS – ORDEN CORRECTO
 # ===========================================
-tab_demo, tab_upload, tab_about = st.tabs([
+tab_about, tab_demo, tab_upload = st.tabs([
+    "ℹ️ ¿Qué hace la herramienta?",
     "📊 Ejemplo de resultado obtenido",
-    "👆 Subir mi propia imagen",
-    "ℹ️ Acerca de la herramienta"
+    "👆 Subí tu propia imagen"
 ])
 
 # ===========================================
@@ -72,7 +72,6 @@ def regiones_validas_ordenadas(mask_bin, area_min=1000, excluir_borde=True, marg
     regs.sort(key=lambda r: (r.centroid[1], r.centroid[0]))
     return lab, regs
 
-
 # ===========================================
 # SEGMENTACIÓN HSV (FONDO AZUL)
 # ===========================================
@@ -84,7 +83,6 @@ def segmentar_porotos(img_bgr, azul_bajo, azul_alto, kernel_size, close_iters, o
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k, iterations=close_iters)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k, iterations=open_iters)
     return mask
-
 
 # ===========================================
 # MEDICIÓN
@@ -120,13 +118,12 @@ def medir_porotos(img_bgr, mask_bin, dpi, area_min, descartar_borde, margen_bord
 
     return pd.DataFrame(filas), fig
 
-
 # ===========================================
 # SIDEBAR – PARÁMETROS
 # ===========================================
 st.sidebar.header("Parámetros")
 
-dpi = st.sidebar.number_input("DPI del escáner", 300, 2400, 800, step=50)
+dpi = st.sidebar.number_input("DPI del escáner (Epson V850 PRO)", 300, 2400, 800, step=50)
 area_min = st.sidebar.number_input("Área mínima (px²)", 100, 1000000, 1000)
 
 descartar_borde = st.sidebar.checkbox("Excluir objetos cerca del borde", True)
@@ -147,36 +144,74 @@ kernel_size = st.sidebar.slider("Kernel morfológico (px)", 1, 15, 5, step=2)
 close_iters = st.sidebar.slider("Cierre", 0, 5, 2)
 open_iters = st.sidebar.slider("Apertura", 0, 5, 1)
 
+# ===========================================
+# TAB 1 – ¿QUÉ HACE LA HERRAMIENTA?
+# ===========================================
+with tab_about:
+    st.markdown("""
+### ¿Qué hace esta herramienta?
+Esta aplicación permite la **segmentación automática y medición morfológica de porotos** a partir de imágenes escaneadas, calculando métricas objetivas como área, perímetro, ejes principales y circularidad.
+
+La herramienta fue diseñada específicamente para apoyar estudios de **calidad física de semillas**, utilizando técnicas de **procesamiento digital de imágenes**.
+
+---
+### Marco institucional
+Esta herramienta fue desarrollada en el marco de una **Beca de Iniciación a la Investigación**, financiada por la **Dirección de Investigación y Desarrollo de la Universidad Tecnológica del Uruguay (UTEC)**.
+
+**Tutoría:**
+- Nelcy Atehortua  
+- Daniel Bueno  
+- Natalia De Almeida
+
+**Grupos de investigación:**
+- Grupo de Agroecología y Medio Ambiente (**GASMA**)  
+- Grupo de investigación en Aplicaciones en Inteligencia Artificial (**ARIA**)
+
+---
+### Instructivo de uso
+1. Escanear los porotos utilizando el **escáner Epson Perfection V850 PRO**.
+2. Utilizar **fondo azul uniforme**.
+3. Subir la imagen en la pestaña *Subí tu propia imagen*.
+4. Ajustar los parámetros en la barra lateral si es necesario.
+5. Visualizar y descargar los resultados obtenidos.
+
+---
+### Parámetros (barra lateral)
+- **DPI**: Conversión de píxeles a milímetros.
+- **Área mínima**: Elimina ruido y partículas pequeñas.
+- **Margen de borde**: Descarta objetos incompletos.
+- **HSV**: Define el rango de color del fondo azul.
+- **Cierre / Apertura**: Corrige huecos y ruido en la segmentación.
+""")
 
 # ===========================================
-# TAB 1 – RESULTADOS DEMO
+# TAB 2 – RESULTADOS DEMO
 # ===========================================
 with tab_demo:
-    st.subheader("Resultados obtenidos en la investigación")
+    st.subheader("Ejemplo de resultado obtenido")
 
     if os.path.exists(DEMO_OVERLAY_PATH):
-        st.image(DEMO_OVERLAY_PATH, caption="Imagen demo: segmentación y medición automática", use_container_width=True)
+        st.image(DEMO_OVERLAY_PATH, caption="Resultado de segmentación y medición", use_container_width=True)
     else:
-        st.warning("No se encontró la imagen demo.")
+        st.warning("No se encontró la imagen demo en /data")
 
     if os.path.exists(DEMO_RESULTS_PATH):
         df_demo = pd.read_csv(DEMO_RESULTS_PATH)
-        st.dataframe(df_demo, use_container_width=True)
+        st.dataframe(df_demo.round(2), use_container_width=True)
         st.download_button(
-            "⬇️ Descargar CSV demo",
+            "⬇️ Descargar CSV de ejemplo",
             data=df_demo.to_csv(index=False).encode("utf-8"),
-            file_name="resultados_demo.csv",
+            file_name="ejemplo_resultados.csv",
             mime="text/csv"
         )
     else:
-        st.warning("No se encontró el archivo CSV demo.")
-
+        st.warning("No se encontró el CSV demo en /data")
 
 # ===========================================
-# TAB 2 – SUBIR IMAGEN
+# TAB 3 – SUBIR IMAGEN
 # ===========================================
 with tab_upload:
-    st.markdown("**⚠️ Esta herramienta funciona únicamente con imágenes capturadas con el escáner Epson Perfection V850 PRO y fondo azul uniforme.**")
+    st.warning("⚠️ Esta herramienta funciona únicamente con imágenes capturadas con el escáner Epson Perfection V850 PRO y fondo azul uniforme.")
 
     up = st.file_uploader("Subí tu imagen", type=["jpg", "jpeg", "png", "tif", "tiff"])
 
@@ -203,42 +238,3 @@ with tab_upload:
 
     st.pyplot(fig, use_container_width=True)
     st.dataframe(df_med.round(2), use_container_width=True)
-
-
-# ===========================================
-# TAB 3 – ACERCA DE
-# ===========================================
-with tab_about:
-    st.markdown("""
-### ¿Qué hace esta herramienta?
-Esta aplicación permite la **segmentación automática, medición morfológica y análisis básico de color** de porotos a partir de imágenes escaneadas, proporcionando métricas objetivas y reproducibles para estudios de semillas.
-
-### Marco institucional
-Esta herramienta fue desarrollada en el marco de una **Beca de Iniciación a la Investigación**, financiada por la **Dirección de Investigación y Desarrollo de la Universidad Tecnológica del Uruguay (UTEC)**.
-
-### Tutoría
-- Nelcy Atehortua  
-- Daniel Bueno  
-- Natalia De Almeida
-
-### Grupos de investigación
-- **Grupo de Agroecología y Medio Ambiente (GASMA)**  
-- **Grupo de investigación en Aplicaciones en Inteligencia Artificial (ARIA)**
-
-### Instructivo de uso
-1. Escanear los porotos con **Epson Perfection V850 PRO**, resolución conocida (ej. 800 DPI).
-2. Utilizar **fondo azul uniforme**.
-3. Subir la imagen en la pestaña correspondiente.
-4. Ajustar parámetros de segmentación y morfología en la barra lateral.
-5. Descargar los resultados en formato CSV.
-
-### Parámetros (barra lateral)
-- **DPI**: convierte píxeles a milímetros.
-- **Área mínima**: elimina ruido.
-- **Margen de borde**: descarta objetos tocando el marco.
-- **HSV**: define el rango del fondo azul.
-- **Cierre / Apertura**: corrige huecos o ruido.
-
----
-Desarrollado con fines académicos y de investigación.
-""")
