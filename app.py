@@ -1,10 +1,11 @@
-# app.py - FUSIÓN DE FUNCIONALIDADES
+# app.py
 # ===========================================
 # UI de Streamlit para análisis de porotos:
 # - Segmentación por HSV (fondo azul)
 # - Medición en mm (DPI configurable)
+# - Tabla: id_poroto, área, perímetro, ejes, circularidad
 # - Color promedio (RGB/HSV) y K-Means opcional por poroto
-# - Estructura de pestañas con Info/Demo/Carga de Usuario
+# - Filtro "margen de borde" para evitar falsos positivos pegados al marco
 # ===========================================
 
 import os, math
@@ -14,28 +15,24 @@ import cv2
 import matplotlib.pyplot as plt
 import streamlit as st
 from skimage.measure import label, regionprops
-# from skimage.morphology import convex_hull_image # No se usa, se comenta.
-
-# -----------------------------
-# Rutas de Archivos
-# -----------------------------
-# Asegúrate de que estas rutas sean accesibles en tu ambiente Streamlit
-DEMO_OVERLAY_PATH = "data/demo_overlay.jpg" 
-DEMO_RESULTS_PATH = "data/demo_results.csv"
-LOGO_UTEC_PATH = "data/logo_utec.png"
-LOGO_ARIA_PATH = "data/logo_aria.png"
-LOGO_GASMA_PATH = "data/logo_gasma.jpg"
+# from skimage.morphology import convex_hull_image 
 
 # -----------------------------
 # Config general de la página
 # -----------------------------
 st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
+st.title("🌱 Análisis morfológico de porotos")
+st.markdown("Selecciona el modo de operación. El análisis en tiempo real segmenta, mide y calcula color por poroto.")
 
-# ======================================================
-# ===================== FUNCIONES ======================
-# ====== (Mantenidas del código base proporcionado) ====
-# ======================================================
+# -----------------------------
+# Rutas de Archivos de Demostración
+# -----------------------------
+DEMO_OVERLAY_PATH = "data/demo_overlay.jpg" 
+DEMO_RESULTS_PATH = "data/demo_results.csv"
 
+# -----------------------------
+# Utilidades
+# -----------------------------
 def bgr2rgb(img: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -74,12 +71,15 @@ def _place_text_inside(ax, bbox, texto, img_w, img_h,
     Coloca el texto dentro del área visible.
     """
     minr, minc, maxr, maxc = bbox
+
+    # Horizontal
     x = minc + margin
     ha = 'left'
     if (minc + label_w_px + margin) > img_w:
         x = maxc - margin
         ha = 'right'
 
+    # Vertical
     y = minr + margin
     va = 'top'
     if (minr + label_h_px + margin) > img_h:
@@ -94,6 +94,9 @@ def _place_text_inside(ax, bbox, texto, img_w, img_h,
         clip_on=True
     )
 
+# -----------------------------
+# Segmentación HSV (fondo azul)
+# -----------------------------
 def segmentar_porotos(img_bgr,
                       azul_bajo=(90, 50, 50),
                       azul_alto=(140, 255, 255),
@@ -109,6 +112,9 @@ def segmentar_porotos(img_bgr,
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  k, iterations=open_iters)
     return mask
 
+# -----------------------------
+# Medición + forma + color
+# -----------------------------
 def medir_porotos(img_bgr, mask_bin,
                   dpi=800, area_min=1000,
                   descartar_borde=True, margen_borde_px=20,
@@ -145,6 +151,7 @@ def medir_porotos(img_bgr, mask_bin,
         per_px  = float(r.perimeter)
         maj_px  = max(float(r.major_axis_length), 1e-6)
         min_px  = max(float(r.minor_axis_length), 1e-6)
+        # cy_px, cx_px = r.centroid
 
         # Conversión a mm
         area_mm2       = area_px * px2_to_mm2
@@ -184,8 +191,7 @@ def medir_porotos(img_bgr, mask_bin,
 
         # K-Means (opcional)
         if calcular_kmeans:
-            from sklearn.cluster import KMeans # Importación local
-
+            from sklearn.cluster import KMeans 
             roi = img_bgr[minr:maxr, minc:maxc]
             roi_mask = mask_bool[minr:maxr, minc:maxc]
             pix = roi[roi_mask].reshape(-1, 3)  # BGR
@@ -227,7 +233,7 @@ def medir_porotos(img_bgr, mask_bin,
     return df_med, fig, df_km
 
 # ===========================================
-# SIDEBAR — Parámetros
+# Sidebar — Parámetros
 # ===========================================
 st.sidebar.header("Parámetros")
 dpi = st.sidebar.number_input("DPI (escáner)", 100, 2400, 800, step=50)
@@ -258,105 +264,77 @@ k_clusters    = st.sidebar.slider("k clusters", 2, 5, 3)
 k_sample_max  = st.sidebar.number_input("Muestreo máx. (pix por poroto)", 1000, 200000, 15000, step=1000)
 
 # ===========================================
-# SECCIÓN PRINCIPAL — TABS
+# 1) MODO DE OPERACIÓN (Demo vs. Usuario)
 # ===========================================
+tab1, tab2 = st.tabs(["📊 1. Resultados de Colab (Demo)", "👆 2. Subir Mi Propia Imagen"])
 
-# Títulos principales
-col_logo1, col_logo2, col_logo3 = st.columns([1,1,1])
-# Intentamos cargar los logos, si fallan, no pasa nada
-try:
-    with col_logo1: st.image(LOGO_UTEC_PATH, use_container_width=True)
-    with col_logo2: st.image(LOGO_ARIA_PATH, use_container_width=True)
-    with col_logo3: st.image(LOGO_GASMA_PATH, use_container_width=True)
-except FileNotFoundError:
-     # No hacemos nada si los logos no están, ya que no son críticos para la funcionalidad
-     pass
-
-st.title("🌱 Análisis morfológico de porotos")
-st.markdown("Selecciona el modo de operación. El análisis en tiempo real segmenta, mide y calcula color por poroto.")
-
-tab_info, tab_demo, tab_user = st.tabs([
-    "ℹ️ 1. ¿Qué hace la herramienta?",
-    "📊 2. Ejemplo de resultado",
-    "👆 3. Subir mi propia imagen"
-])
-
-# Inicializa 'up' a None. Se redefinirá en tab_user.
+# Inicializa 'up' a None. Se redefinirá en tab2 si el usuario interactúa.
 up = None 
 
-# -------- TAB INFO (Logos y Descripción) --------
-with tab_info:
-    st.header("Propósito y Funcionamiento")
-    st.markdown("""
-    Esta herramienta permite el **análisis morfológico y cromático de porotos**
-    a partir de imágenes escaneadas con fondo azul (típicamente de un escáner plano
-    de alta resolución como el Epson Perfection V850 PRO).
-
-    El *pipeline* de análisis está diseñado para la **reproducibilidad y uso académico**,
-    separando explícitamente:
-    1.  **Segmentación**: Aislamiento de los porotos del fondo azul mediante umbralización en el espacio de color **HSV**.
-    2.  **Medición**: Cálculo de área, perímetro y dimensiones de ejes (L/W) en milímetros (mm), usando el **DPI** configurado.
-    3.  **Color**: Cálculo del color promedio (RGB/HSV) y opcionalmente, la identificación de los **colores dominantes** mediante el algoritmo **K-Means**.
-    """)
-
-# -------- TAB DEMO (Resultados de ejemplo) --------
-with tab_demo:
-    st.header("Resultados de Ejemplo")
-    st.markdown("Visualiza un caso de estudio con los parámetros por defecto.")
+# -------------------------------------------
+# PESTAÑA 1: RESULTADOS DE EJEMPLO DE COLAB
+# -------------------------------------------
+with tab1:
+    st.header("Resultados de la Investigación de Ejemplo")
+    st.markdown("Estos son los datos e imágenes generados en Google Colab para demostrar el *pipeline* completo. Puedes explorar las medidas y visualizaciones finales.")
     
     try:
         col_img, col_data = st.columns([2, 3])
         
         with col_img:
-            st.subheader("Visualización Final del Proceso ")
+            st.subheader("Visualización Final del Proceso")
             st.image(DEMO_OVERLAY_PATH, 
-                     caption=f"Imagen con segmentación, medidas y etiquetas superpuestas", 
+                     caption=f"Imagen con segmentación, medidas y etiquetas superpuestas (Fuente: {os.path.basename(DEMO_OVERLAY_PATH)})", 
                      use_column_width=True)
         
         with col_data:
-            st.subheader("Tabla de Medidas Generadas (Recorte)")
+            st.subheader("Tabla de Medidas Generadas")
             df_demo = pd.read_csv(DEMO_RESULTS_PATH)
             
             # Mostrar solo las columnas clave y redondear
             cols_to_show = [c for c in ["id_poroto", "area_mm2", "circularidad", "R", "G", "B"] if c in df_demo.columns]
             st.dataframe(df_demo[cols_to_show].round(2), use_container_width=True)
             
+            # Botón de descarga de los datos brutos del demo
             csv_demo = df_demo.to_csv(index=False).encode('utf-8')
-            st.download_button("⬇️ Descargar Datos de Ejemplo (CSV)",
+            st.download_button("⬇️ Descargar Datos de Colab (CSV)",
                                data=csv_demo,
-                               file_name="demo_resultados_ejemplo.csv",
+                               file_name="demo_resultados_colab.csv",
                                mime='text/csv')
+            
 
     except FileNotFoundError:
-        st.error(f"⚠️ Archivos de demostración no encontrados. Asegúrate de que '{os.path.basename(DEMO_OVERLAY_PATH)}' y '{os.path.basename(DEMO_RESULTS_PATH)}' estén en la carpeta **data/**.")
+        st.error("⚠️ Archivos de demostración no encontrados.")
+        st.caption(f"Asegúrate de haber subido **{os.path.basename(DEMO_OVERLAY_PATH)}** y **{os.path.basename(DEMO_RESULTS_PATH)}** a la carpeta **'data/'** de tu repositorio de GitHub.")
+    
+    # IMPORTANTE: Eliminamos el st.stop() de aquí para que el script continúe a tab2.
 
-# -------- TAB USER (Carga del usuario) --------
-with tab_user:
-    st.subheader("Sube tu imagen con fondo azul")
-    up = st.file_uploader("Subí una imagen (JPG/PNG/TIF) para el análisis. Ajusta los parámetros en la barra lateral.", type=["jpg","jpeg","png","tif","tiff"])
-
+# -------------------------------------------
+# PESTAÑA 2: CARGA DEL USUARIO (Lógica Original Adaptada)
+# -------------------------------------------
+with tab2:
+    st.subheader("Sube tu propia imagen para análisis en tiempo real")
+    # Al estar dentro del bloque 'with tab2', este uploader solo es visible en esta pestaña.
+    up = st.file_uploader("Subí una imagen con fondo azul (JPG/PNG/TIF)", type=["jpg","jpeg","png","tif","tiff"])
 
 # ===========================================
-# CONTROL DE FLUJO Y ANÁLISIS (Se ejecuta fuera de las tabs)
+# CONTROL DE FLUJO Y ANÁLISIS
 # ===========================================
-# Este bloque se ejecuta solo si hay un archivo cargado en la pestaña 'up'.
+
+# Si 'up' es None, significa que el usuario está en tab2 y no ha subido una imagen (o está en tab1).
+# Detenemos la ejecución de las secciones de análisis (2, 3, 4).
 if up is None:
-    st.caption("Esperando que se cargue una imagen en la pestaña 👆 3. Subir mi propia imagen.")
+    # Usamos st.empty() para poner un mensaje en la pestaña activa (tab2, si el usuario la seleccionó)
+    if not os.path.exists(DEMO_OVERLAY_PATH) and not os.path.exists(DEMO_RESULTS_PATH):
+         st.warning("Selecciona una imagen en la pestaña 2 para continuar con el análisis.")
     st.stop() # Detenemos la ejecución aquí si no hay archivo
 
-# Si llegamos aquí, 'up' tiene una imagen válida.
-try:
-    file_bytes = np.asarray(bytearray(up.read()), dtype=np.uint8)
-    img_bgr = cv2.imdecode(file_bytes, 1)
-    if img_bgr is None:
-        st.error("No se pudo leer la imagen. Intenta con otro formato.")
-        st.stop()
-except Exception as e:
-    st.error(f"Ocurrió un error al procesar la imagen: {e}")
+# Si llegamos aquí, 'up' tiene una imagen válida y podemos procesarla.
+file_bytes = np.asarray(bytearray(up.read()), dtype=np.uint8)
+img_bgr = cv2.imdecode(file_bytes, 1)
+if img_bgr is None:
+    st.error("No se pudo leer la imagen.")
     st.stop()
-
-st.header(f"Resultados para: {up.name}")
-st.markdown("---")
 
 # ===========================================
 # 2) Segmentación
@@ -373,7 +351,7 @@ with colB:
 # ===========================================
 # 3) Medición
 # ===========================================
-st.subheader("3) Medición Morfológica y Overlay ")
+st.subheader("3) Medición")
 df_med, fig_overlay, df_km = medir_porotos(
     img_bgr, mask,
     dpi=dpi, area_min=area_min,
@@ -384,7 +362,7 @@ df_med, fig_overlay, df_km = medir_porotos(
 )
 
 if df_med.empty:
-    st.warning("No se detectaron porotos válidos con los parámetros actuales. Ajusta DPI, Área Mínima o Segmentación.")
+    st.warning("No se detectaron porotos válidos con los parámetros actuales.")
     st.stop()
 
 col1, col2 = st.columns([1, 1])
@@ -405,12 +383,9 @@ with col2:
 # ===========================================
 # 4) Color
 # ===========================================
-st.subheader("4) Análisis de Color")
-st.markdown("---")
-
-# 4.1 Color promedio
+st.subheader("4) Color")
 if do_color_prom and {"R","G","B","H","S","V"}.issubset(df_med.columns):
-    st.markdown("**Color promedio (RGB/HSV)**")
+    st.markdown("**Color promedio por poroto**")
     df_color = df_med[["id_poroto","R","G","B","H","S","V"]].copy()
     df_color[["R","G","B"]] = df_color[["R","G","B"]].round(0)
     st.dataframe(df_color, use_container_width=True)
@@ -423,45 +398,24 @@ if do_color_prom and {"R","G","B","H","S","V"}.issubset(df_med.columns):
 else:
     st.caption("Activa “Color promedio (RGB/HSV)” en la barra lateral para ver esta tabla.")
 
-st.markdown("---")
-
-# 4.2 K-Means (Visualización y Tabla)
 if df_km is not None and not df_km.empty:
-    
-    st.markdown("**Colores dominantes por poroto (K-Means)**")
-
-    # Parches proporcionales por poroto
-    st.markdown("##### Visualización de Parches Proporcionales")
-    
-    # Usamos una columna para centrar o controlar el ancho de los parches
-    patch_cols = st.columns(6) 
-    
-    for i, pid in enumerate(sorted(df_km["id_poroto"].unique())):
-        sub = df_km[df_km["id_poroto"] == pid].sort_values("cluster_rank")
-        width = 300
-        patch = np.zeros((40, width, 3), dtype=np.uint8)
-        start = 0
-        
-        # Crear la imagen del parche
-        for _, row in sub.iterrows():
-            r, g, b = int(row["R"]), int(row["G"]), int(row["B"])
-            # Asegurar que la suma de w no exceda 'width' debido a errores de redondeo float
-            w = min(width - start, int(width * float(row["proportion"]))) 
-            patch[:, start:start+w, :] = [r, g, b] 
-            start += w
-            
-        # Corregir el último pixel si quedó un hueco por redondeo
-        if start < width:
-             patch[:, start:width, :] = [r, g, b] # Llenar el resto con el color del último cluster
-
-        # Mostrar en la columna
-        with patch_cols[i % 6]:
-             st.image(patch, caption=f"Poroto {pid}", use_container_width=True)
-
-    # Mostrar la tabla de K-Means
-    st.markdown("##### Tabla de Clusters K-Means (cluster_rank=1 es el más predominante)")
+    st.markdown("**Colores dominantes por poroto (K-Means)** — `cluster_rank=1` es el más predominante.")
     st.dataframe(df_km[["id_poroto","cluster_rank","proportion","R","G","B","H","S","V"]].round(3),
                     use_container_width=True)
+
+    # Parches proporcionales por poroto
+    st.markdown("**Parches proporcionales**")
+    for pid in sorted(df_km["id_poroto"].unique()):
+        sub = df_km[df_km["id_poroto"] == pid].sort_values("cluster_rank")
+        width = 320
+        patch = np.zeros((40, width, 3), dtype=np.uint8)
+        start = 0
+        for _, row in sub.iterrows():
+            r, g, b = int(row["R"]), int(row["G"]), int(row["B"])
+            w = int(width * float(row["proportion"]))
+            patch[:, start:start+w, :] = [r, g, b] 
+            start += w
+        st.image(patch, caption=f"Poroto {pid} — mezcla por proporción", use_container_width=False)
 
     csv_km = df_km.to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Descargar K-Means (CSV)",
@@ -476,14 +430,21 @@ else:
 # ===========================================
 st.markdown("""
 ---
-### Guía de Referencia de Columnas
+### ¿Qué significa cada columna?
 
-- **id_poroto**: identificador consecutivo (orden espacial IZQ→DER y ARR→ABAJO).
+- **id_poroto**: identificador consecutivo (orden espacial IZQ→DER y ARR→ABAJO) tras filtrar.
 - **area_mm2 (A)**: área proyectada (mm²). Conversión px→mm usa el **DPI** configurado.
-- **circularidad**: $4\\pi A / P^2$. Cercano a 1 indica formas más redondeadas.
+- **perimetro_mm (P)**: perímetro del contorno (mm).
+- **eje_mayor_mm (L)**: longitud del eje mayor del elipse equivalente (mm).
+- **eje_menor_mm (W)**: longitud del eje menor del elipse equivalente (mm).
+- **circularidad**: \\( 4\\pi A / P^2 \\). Cercano a 1 indica formas más redondeadas.
 - **R,G,B**: color promedio del poroto en RGB (0–255).
-- **H,S,V**: color promedio en HSV (OpenCV: **H∈[0,179]**, **S,V∈[0,255]**).
+- **H,S,V**: color promedio en HSV (OpenCV: **H∈[0,179]**, **S,V∈[255]**).
 - **cluster_rank** (K-Means): 1 = color más predominante del poroto.
+- **proportion** (K-Means): fracción del poroto representada por cada cluster.
 
-**Próximo paso:** Podrías ajustar los parámetros de segmentación (H, S, V) en la barra lateral para afinar el análisis de tu imagen.
+**Notas**
+- El **margen de borde (px)** descarta componentes pegados al marco (útil para brillos/ruido).
+- Aumentar **Área mínima** y/o la **Apertura** morfológica reduce puntitos de ruido.
 """)
+
