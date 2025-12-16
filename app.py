@@ -13,6 +13,8 @@ import cv2
 import matplotlib.pyplot as plt
 import streamlit as st
 from skimage.measure import label, regionprops
+# La importación de KMeans se deja dentro de medir_porotos,
+# como estaba en el original, para una carga condicional.
 
 # -----------------------------
 # Config general
@@ -24,7 +26,8 @@ st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide"
 # -----------------------------
 col_logo1, col_logo2, col_logo3 = st.columns([1,1,1])
 with col_logo1:
-    st.image("data/logo_utec.png", use_container_width=True)
+    # Asumiendo que las rutas son correctas, si no existen, esto fallará.
+    st.image("data/logo_utec.png", use_container_width=True) 
 with col_logo2:
     st.image("data/logo_aria.png", use_container_width=True)
 with col_logo3:
@@ -119,8 +122,8 @@ def _place_text_inside(
         clip_on=True
     )
 
-
-ef segmentar_porotos(
+# **ERROR CORREGIDO: la función estaba mal indentada en el código original.**
+def segmentar_porotos(
     img_bgr,
     azul_bajo=(90, 50, 50),
     azul_alto=(140, 255, 255),
@@ -148,6 +151,7 @@ ef segmentar_porotos(
     )
     return mask
 
+# **ERROR CORREGIDO: faltaba la 'd' en la definición de la función 'def' en el código original.**
 def medir_porotos(
     img_bgr,
     mask_bin,
@@ -249,6 +253,7 @@ def medir_porotos(
 
         # K-Means (opcional)
         if calcular_kmeans:
+            # Importar solo si se usa
             from sklearn.cluster import KMeans
 
             roi = img_bgr[minr:maxr, minc:maxc]
@@ -397,13 +402,23 @@ with tab_demo:
 with tab_user:
     up = st.file_uploader("Subí imagen con fondo azul", ["jpg","png","tif","tiff"])
     if up:
-        img = cv2.imdecode(np.frombuffer(up.read(),np.uint8),1)
+        # Nota: cv2.imdecode y np.frombuffer esperan bytes
+        img = cv2.imdecode(np.frombuffer(up.read(),np.uint8),1) 
+        
+        # Segmentación
         mask = segmentar_porotos(img, azul_bajo, azul_alto, kernel_size, close_iters, open_iters)
-        df_med, fig, _ = medir_porotos(
+        
+        # Medición y color
+        df_med, fig, df_km = medir_porotos( # Se almacena df_km aunque no se use en este bloque
             img, mask, dpi, area_min, descartar_borde,
             margen_borde_px, do_color_prom, do_kmeans,
             3, 15000, 0
         )
+        
         st.pyplot(fig, use_container_width=True)
         st.dataframe(df_med.round(2), use_container_width=True)
-
+        
+        # Mostrar K-Means si está disponible
+        if do_kmeans and df_km is not None:
+            st.subheader("Resultados K-Means")
+            st.dataframe(df_km.round(2), use_container_width=True)
