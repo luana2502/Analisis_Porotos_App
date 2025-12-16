@@ -1,4 +1,3 @@
-# app.py
 # ===========================================
 # Análisis morfológico de porotos
 # Herramienta desarrollada en el marco de una
@@ -62,11 +61,6 @@ def regiones_validas_ordenadas(
     excluir_borde: bool = True,
     margen_borde_px: int = 20
 ):
-    """
-    Filtra regiones por área y descarta las cuya bbox entra en una franja de
-    'margen_borde_px' contra cualquiera de los 4 bordes.
-    Ordena por X (columna) y luego Y (fila).
-    """
     mb = (mask_bin > 0)
     lab = label(mb)
     regs0 = regionprops(lab)
@@ -96,19 +90,14 @@ def _place_text_inside(
     ax, bbox, texto, img_w, img_h,
     label_w_px=160, label_h_px=78, margin=5
 ):
-    """
-    Coloca el texto dentro del área visible.
-    """
     minr, minc, maxr, maxc = bbox
 
-    # Horizontal
     x = minc + margin
     ha = 'left'
     if (minc + label_w_px + margin) > img_w:
         x = maxc - margin
         ha = 'right'
 
-    # Vertical
     y = minr + margin
     va = 'top'
     if (minr + label_h_px + margin) > img_h:
@@ -122,14 +111,9 @@ def _place_text_inside(
         fontweight='bold',
         ha=ha,
         va=va,
-        bbox=dict(
-            facecolor=(0, 0, 0, 0.45),
-            edgecolor='none',
-            pad=2.0
-        ),
+        bbox=dict(facecolor=(0,0,0,0.45), edgecolor='none', pad=2.0),
         clip_on=True
     )
-
 
 # -----------------------------
 # Segmentación HSV (fondo azul)
@@ -142,7 +126,6 @@ def segmentar_porotos(
     close_iters=2,
     open_iters=1
 ):
-    """Devuelve máscara 0/255 con porotos en blanco."""
     hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
     low = np.array(azul_bajo, dtype=np.uint8)
     high = np.array(azul_alto, dtype=np.uint8)
@@ -151,17 +134,12 @@ def segmentar_porotos(
     mask = cv2.bitwise_not(mask_bg)
 
     k = cv2.getStructuringElement(
-        cv2.MORPH_ELLIPSE,
-        (kernel_size, kernel_size)
+        cv2.MORPH_ELLIPSE, (kernel_size, kernel_size)
     )
-    mask = cv2.morphologyEx(
-        mask, cv2.MORPH_CLOSE, k, iterations=close_iters
-    )
-    mask = cv2.morphologyEx(
-        mask, cv2.MORPH_OPEN, k, iterations=open_iters
-    )
-    return mask
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k, iterations=close_iters)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k, iterations=open_iters)
 
+    return mask
 
 # -----------------------------
 # Medición + forma + color
@@ -179,11 +157,6 @@ def medir_porotos(
     kmeans_sample_max=15000,
     random_state=0
 ):
-    """
-    Mide porotos (mm) y calcula color.
-    Retorna: df_med (una fila por poroto),
-    fig_overlay (matplotlib) y df_kmeans (o None).
-    """
     px_to_mm = 25.4 / float(dpi)
     px2_to_mm2 = px_to_mm ** 2
 
@@ -204,28 +177,22 @@ def medir_porotos(
     img_h, img_w = img_bgr.shape[:2]
     filas = []
     filas_km = []
-
     mask_bool = (mask_bin > 0)
 
     for idx, r in enumerate(regs, start=1):
         minr, minc, maxr, maxc = r.bbox
 
-        # Geometría en px
         area_px = int(r.area)
         per_px = float(r.perimeter)
         maj_px = max(float(r.major_axis_length), 1e-6)
         min_px = max(float(r.minor_axis_length), 1e-6)
 
-        # Conversión a mm
         area_mm2 = area_px * px2_to_mm2
         per_mm = per_px * px_to_mm
         eje_mayor_mm = maj_px * px_to_mm
         eje_menor_mm = min_px * px_to_mm
 
-        # Forma
-        circularidad = (
-            4.0 * math.pi * area_px
-        ) / (per_px * per_px + 1e-12)
+        circularidad = (4.0 * math.pi * area_px) / (per_px**2 + 1e-12)
 
         row = {
             "id_poroto": idx,
@@ -236,89 +203,8 @@ def medir_porotos(
             "circularidad": circularidad
         }
 
-        # Color promedio
-        if calcular_color_promedio:
-            roi_mask = mask_bool[minr:maxr, minc:maxc]
-            roi = img_bgr[minr:maxr, minc:maxc]
-            m = roi_mask.astype(bool)
-            if m.sum() > 0:
-                b_mean = float(np.mean(roi[:, :, 0][m]))
-                g_mean = float(np.mean(roi[:, :, 1][m]))
-                r_mean = float(np.mean(roi[:, :, 2][m]))
-
-                hsv = cv2.cvtColor(
-                    np.uint8([[[int(round(b_mean)),
-                                int(round(g_mean)),
-                                int(round(r_mean))]]]),
-                    cv2.COLOR_BGR2HSV
-                )[0, 0]
-                h, s, v = [int(x) for x in hsv]
-
-                row.update({
-                    "R": r_mean,
-                    "G": g_mean,
-                    "B": b_mean,
-                    "H": h,
-                    "S": s,
-                    "V": v
-                })
-
         filas.append(row)
 
-        # K-Means (opcional)
-        if calcular_kmeans:
-            from sklearn.cluster import KMeans
-
-            roi = img_bgr[minr:maxr, minc:maxc]
-            roi_mask = mask_bool[minr:maxr, minc:maxc]
-            pix = roi[roi_mask].reshape(-1, 3)  # BGR
-
-            if len(pix) >= k:
-                if len(pix) > kmeans_sample_max:
-                    rng = np.random.default_rng(random_state + idx)
-                    sel = rng.choice(
-                        len(pix),
-                        kmeans_sample_max,
-                        replace=False
-                    )
-                    pix = pix[sel]
-
-                km = KMeans(
-                    n_clusters=k,
-                    random_state=random_state,
-                    n_init='auto',
-                    max_iter=300
-                ).fit(pix)
-
-                centers = km.cluster_centers_.astype(np.uint8)
-                counts = np.bincount(km.labels_, minlength=k)
-                props = counts / counts.sum()
-
-                order = np.argsort(-props)
-                centers = centers[order]
-                props = props[order]
-
-                hsv_centers = cv2.cvtColor(
-                    centers.reshape(1, -1, 3),
-                    cv2.COLOR_BGR2HSV
-                ).reshape(-1, 3)
-
-                for rank in range(k):
-                    b, g, r = [int(x) for x in centers[rank]]
-                    h_, s_, v_ = [int(x) for x in hsv_centers[rank]]
-                    filas_km.append({
-                        "id_poroto": idx,
-                        "cluster_rank": rank + 1,
-                        "proportion": float(props[rank]),
-                        "R": r,
-                        "G": g,
-                        "B": b,
-                        "H": h_,
-                        "S": s_,
-                        "V": v_
-                    })
-
-        # Dibujo: bbox y texto (A/P/L/W)
         ax.add_patch(
             plt.Rectangle(
                 (minc, minr),
@@ -338,20 +224,10 @@ def medir_porotos(
             f"W:{eje_menor_mm:.1f} mm"
         )
 
-        _place_text_inside(
-            ax,
-            (minr, minc, maxr, maxc),
-            txt,
-            img_w,
-            img_h
-        )
+        _place_text_inside(ax, (minr, minc, maxr, maxc), txt, img_w, img_h)
 
     df_med = pd.DataFrame(filas)
-    df_km = (
-        pd.DataFrame(filas_km)
-        if (calcular_kmeans and len(filas_km))
-        else None
-    )
+    df_km = None
 
     fig.tight_layout()
     return df_med, fig, df_km
@@ -361,118 +237,33 @@ def medir_porotos(
 # ===========================================
 st.sidebar.header("Parámetros")
 
-dpi = st.sidebar.number_input("DPI del escáner (Epson V850 PRO)", 300, 2400, 800, step=50)
+dpi = st.sidebar.number_input("DPI del escáner", 300, 2400, 800, step=50)
 area_min = st.sidebar.number_input("Área mínima (px²)", 100, 1000000, 1000)
-
-descartar_borde = st.sidebar.checkbox("Excluir objetos cerca del borde", True)
-margen_borde_px = st.sidebar.slider("Margen de borde (px)", 0, 100, 20)
-
-st.sidebar.subheader("Segmentación HSV (fondo azul)")
-h_low = st.sidebar.slider("H min", 0, 179, 90)
-s_low = st.sidebar.slider("S min", 0, 255, 50)
-v_low = st.sidebar.slider("V min", 0, 255, 50)
-h_high = st.sidebar.slider("H max", 0, 179, 140)
-s_high = st.sidebar.slider("S max", 0, 255, 255)
-v_high = st.sidebar.slider("V max", 0, 255, 255)
-
-azul_bajo = (h_low, s_low, v_low)
-azul_alto = (h_high, s_high, v_high)
-
-kernel_size = st.sidebar.slider("Kernel morfológico (px)", 1, 15, 5, step=2)
-close_iters = st.sidebar.slider("Cierre", 0, 5, 2)
-open_iters = st.sidebar.slider("Apertura", 0, 5, 1)
-
-# ===========================================
-# TAB 1 – ¿QUÉ HACE LA HERRAMIENTA?
-# ===========================================
-with tab_about:
-    st.markdown("""
-### ¿Qué hace esta herramienta?
-Esta aplicación permite la **segmentación automática y medición morfológica de porotos** a partir de imágenes escaneadas, calculando métricas objetivas como área, perímetro, ejes principales y circularidad.
-
-La herramienta fue diseñada específicamente para apoyar estudios de **calidad física de semillas**, utilizando técnicas de **procesamiento digital de imágenes**.
-
----
-### Marco institucional
-Esta herramienta fue desarrollada en el marco de una **Beca de Iniciación a la Investigación**, financiada por la **Dirección de Investigación y Desarrollo de la Universidad Tecnológica del Uruguay (UTEC)**.
-
-**Tutoría:**
-- Nelcy Atehortua  
-- Daniel Bueno  
-- Natalia De Almeida
-
-**Grupos de investigación:**
-- Grupo de Agroecología y Medio Ambiente (**GASMA**)  
-- Grupo de investigación en Aplicaciones en Inteligencia Artificial (**ARIA**)
-
----
-### Instructivo de uso
-1. Escanear los porotos utilizando el **escáner Epson Perfection V850 PRO**.
-2. Utilizar **fondo azul uniforme**.
-3. Subir la imagen en la pestaña *Subí tu propia imagen*.
-4. Ajustar los parámetros en la barra lateral si es necesario.
-5. Visualizar y descargar los resultados obtenidos.
-
----
-### Parámetros (barra lateral)
-- **DPI**: Conversión de píxeles a milímetros.
-- **Área mínima**: Elimina ruido y partículas pequeñas.
-- **Margen de borde**: Descarta objetos incompletos.
-- **HSV**: Define el rango de color del fondo azul.
-- **Cierre / Apertura**: Corrige huecos y ruido en la segmentación.
-""")
-
-# ===========================================
-# TAB 2 – RESULTADOS DEMO
-# ===========================================
-with tab_demo:
-    st.subheader("Ejemplo de resultado obtenido")
-
-    if os.path.exists(DEMO_OVERLAY_PATH):
-        st.image(DEMO_OVERLAY_PATH, caption="Resultado de segmentación y medición", use_container_width=True)
-    else:
-        st.warning("No se encontró la imagen demo en /data")
-
-    if os.path.exists(DEMO_RESULTS_PATH):
-        df_demo = pd.read_csv(DEMO_RESULTS_PATH)
-        st.dataframe(df_demo.round(2), use_container_width=True)
-        st.download_button(
-            "⬇️ Descargar CSV de ejemplo",
-            data=df_demo.to_csv(index=False).encode("utf-8"),
-            file_name="ejemplo_resultados.csv",
-            mime="text/csv"
-        )
-    else:
-        st.warning("No se encontró el CSV demo en /data")
+descartar_borde = st.sidebar.checkbox("Excluir borde", True)
+margen_borde_px = st.sidebar.slider("Margen borde (px)", 0, 100, 20)
 
 # ===========================================
 # TAB 3 – SUBIR IMAGEN
 # ===========================================
 with tab_upload:
-    st.warning("⚠️ Esta herramienta funciona únicamente con imágenes capturadas con el escáner Epson Perfection V850 PRO y fondo azul uniforme.")
-
-    up = st.file_uploader("Subí tu imagen", type=["jpg", "jpeg", "png", "tif", "tiff"])
-
+    up = st.file_uploader("Subí tu imagen", type=["jpg", "png", "tif", "tiff"])
     if up is None:
-        st.info("Esperando imagen para iniciar el análisis.")
+        st.info("Esperando imagen.")
         st.stop()
 
     file_bytes = np.asarray(bytearray(up.read()), dtype=np.uint8)
     img_bgr = cv2.imdecode(file_bytes, 1)
 
-    mask = segmentar_porotos(img_bgr, azul_bajo, azul_alto, kernel_size, close_iters, open_iters)
+    mask = segmentar_porotos(img_bgr)
 
-    colA, colB = st.columns(2)
-    with colA:
-        st.image(bgr2rgb(img_bgr), caption="Imagen original", use_container_width=True)
-    with colB:
-        st.image(mask, caption="Máscara segmentada", use_container_width=True)
-
-    df_med, fig = medir_porotos(img_bgr, mask, dpi, area_min, descartar_borde, margen_borde_px)
-
-    if df_med.empty:
-        st.warning("No se detectaron porotos válidos.")
-        st.stop()
+    df_med, fig, _ = medir_porotos(
+        img_bgr,
+        mask,
+        dpi,
+        area_min,
+        descartar_borde,
+        margen_borde_px
+    )
 
     st.pyplot(fig, use_container_width=True)
     st.dataframe(df_med.round(2), use_container_width=True)
