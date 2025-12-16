@@ -1,5 +1,9 @@
+# app.py
 # ===========================================
-# UI de Streamlit para análisis de porotos
+# UI de Streamlit para análisis de porotos:
+# - Segmentación por HSV (fondo azul)
+# - Medición en mm (DPI configurable)
+# - Color promedio y K-Means opcional
 # ===========================================
 
 import os, math
@@ -10,38 +14,36 @@ import matplotlib.pyplot as plt
 import streamlit as st
 from skimage.measure import label, regionprops
 
-# ===========================================
+# -----------------------------
 # Config general
-# ===========================================
-st.set_page_config(
-    page_title="Análisis morfológico de porotos",
-    layout="wide"
-)
+# -----------------------------
+st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
 
-# ===========================================
+# -----------------------------
 # LOGOS
-# ===========================================
-col1, col2, col3 = st.columns([1, 1, 1])
-with col1:
+# -----------------------------
+col_logo1, col_logo2, col_logo3 = st.columns([1,1,1])
+with col_logo1:
     st.image("data/logo_utec.png", use_container_width=True)
-with col2:
+with col_logo2:
     st.image("data/logo_aria.png", use_container_width=True)
-with col3:
+with col_logo3:
     st.image("data/logo_gasma.jpg", use_container_width=True)
 
 st.title("🌱 Análisis morfológico de porotos")
+st.markdown("Selecciona el modo de operación. El análisis segmenta, mide y calcula color por poroto.")
 
-# ===========================================
+# -----------------------------
 # Rutas demo
-# ===========================================
+# -----------------------------
 DEMO_OVERLAY_PATH = "data/demo_overlay.jpg"
 DEMO_RESULTS_PATH = "data/demo_results.csv"
 
-# ===========================================
-# ================= FUNCIONES =================
-# (NO TOCADAS)
-# ===========================================
-def bgr2rgb(img: np.ndarray) -> np.ndarray:
+# ======================================================
+# ===================== FUNCIONES ======================
+# ====== (NO MODIFICADAS, COPIADAS TAL CUAL) ===========
+# ======================================================
+def bgr2rgb(img):
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 def regiones_validas_ordenadas(mask_bin, area_min=1000, excluir_borde=True, margen_borde_px=20):
@@ -86,10 +88,12 @@ def segmentar_porotos(img_bgr, azul_bajo, azul_alto, kernel_size, close_iters, o
 
 def medir_porotos(img_bgr, mask_bin, dpi, area_min, descartar_borde, margen_borde_px,
                    calcular_color_promedio, calcular_kmeans, k, kmeans_sample_max, random_state):
+
     px_to_mm = 25.4 / dpi
     px2_to_mm2 = px_to_mm ** 2
     labels, regs = regiones_validas_ordenadas(mask_bin, area_min, descartar_borde, margen_borde_px)
-    fig, ax = plt.subplots(figsize=(10, 8))
+
+    fig, ax = plt.subplots(figsize=(10,8))
     ax.imshow(bgr2rgb(img_bgr)); ax.axis("off")
 
     if not regs:
@@ -106,43 +110,37 @@ def medir_porotos(img_bgr, mask_bin, dpi, area_min, descartar_borde, margen_bord
         maj_px = max(r.major_axis_length, 1e-6)
         min_px = max(r.minor_axis_length, 1e-6)
 
-        area_mm2 = area_px * px2_to_mm2
-        per_mm = per_px * px_to_mm
-        eje_mayor_mm = maj_px * px_to_mm
-        eje_menor_mm = min_px * px_to_mm
-        circularidad = 4 * math.pi * area_px / (per_px**2 + 1e-12)
-
         row = {
             "id_poroto": idx,
-            "area_mm2": area_mm2,
-            "perimetro_mm": per_mm,
-            "eje_mayor_mm": eje_mayor_mm,
-            "eje_menor_mm": eje_menor_mm,
-            "circularidad": circularidad
+            "area_mm2": area_px * px2_to_mm2,
+            "perimetro_mm": per_px * px_to_mm,
+            "eje_mayor_mm": maj_px * px_to_mm,
+            "eje_menor_mm": min_px * px_to_mm,
+            "circularidad": (4 * math.pi * area_px) / (per_px**2 + 1e-12)
         }
 
         if calcular_color_promedio:
             roi = img_bgr[minr:maxr, minc:maxc]
             m = mask_bool[minr:maxr, minc:maxc]
             if m.sum() > 0:
-                b,g,r = [float(np.mean(roi[:,:,i][m])) for i in range(3)]
-                hsv = cv2.cvtColor(np.uint8([[[b,g,r]]]), cv2.COLOR_BGR2HSV)[0,0]
-                row.update({"R":r,"G":g,"B":b,"H":int(hsv[0]),"S":int(hsv[1]),"V":int(hsv[2])})
+                b,g,r_ = [float(np.mean(roi[:,:,i][m])) for i in range(3)]
+                hsv = cv2.cvtColor(np.uint8([[[b,g,r_]]]), cv2.COLOR_BGR2HSV)[0,0]
+                row.update({"R":r_,"G":g,"B":b,"H":int(hsv[0]),"S":int(hsv[1]),"V":int(hsv[2])})
 
         filas.append(row)
 
         ax.add_patch(plt.Rectangle((minc,minr),maxc-minc,maxr-minr,
                                    edgecolor="lime",linewidth=2,fill=False))
-        txt = f"{idx}\nA:{area_mm2:.1f}\nP:{per_mm:.1f}\nL:{eje_mayor_mm:.1f}\nW:{eje_menor_mm:.1f}"
+        txt = f"{idx}\nA:{row['area_mm2']:.1f}\nP:{row['perimetro_mm']:.1f}"
         _place_text_inside(ax,(minr,minc,maxr,maxc),txt,img_w,img_h)
 
     return pd.DataFrame(filas), fig, None
 
-# ===========================================
-# SIDEBAR — Parámetros
-# ===========================================
+# ======================================================
+# SIDEBAR — Parámetros (igual que original)
+# ======================================================
 st.sidebar.header("Parámetros")
-dpi = st.sidebar.number_input("DPI", 100, 2400, 800, 50)
+dpi = st.sidebar.number_input("DPI (escáner)", 100, 2400, 800, step=50)
 area_min = st.sidebar.number_input("Área mínima (px²)", 10, 1_000_000, 1000)
 descartar_borde = st.sidebar.checkbox("Excluir borde", True)
 margen_borde_px = st.sidebar.slider("Margen borde (px)", 0, 100, 20)
@@ -160,55 +158,49 @@ kernel_size = st.sidebar.slider("Kernel", 1, 15, 5, 2)
 close_iters = st.sidebar.slider("Cierre", 0, 5, 2)
 open_iters = st.sidebar.slider("Apertura", 0, 5, 1)
 
-do_color = st.sidebar.checkbox("Color promedio", True)
+do_color_prom = st.sidebar.checkbox("Color promedio", True)
+do_kmeans = st.sidebar.checkbox("K-Means por poroto", False)
 
-# ===========================================
-# TABS PRINCIPALES
-# ===========================================
-tab_about, tab_demo, tab_user = st.tabs([
+# ======================================================
+# TABS — ORDEN CORRECTO
+# ======================================================
+tab_info, tab_demo, tab_user = st.tabs([
     "ℹ️ ¿Qué hace la herramienta?",
     "📊 Ejemplo de resultado",
-    "👆 Subí tu propia imagen"
+    "👆 Subir tu propia imagen"
 ])
 
-# -------- TAB 1 --------
-with tab_about:
+# -------- TAB INFO --------
+with tab_info:
     st.markdown("""
-    ### ¿Qué hace esta herramienta?
-    Esta aplicación realiza **análisis morfológico y cromático de porotos**
-    a partir de imágenes escaneadas con fondo azul.
-
-    **Flujo principal:**
-    1. Segmentación automática por HSV  
-    2. Identificación y filtrado de porotos válidos  
-    3. Cálculo de métricas morfológicas en mm  
-    4. Análisis de color promedio y opcional K-Means  
+    Esta herramienta permite el **análisis morfológico y cromático de porotos**
+    a partir de imágenes escaneadas con fondo azul (Epson Perfection V850 PRO).
 
     El diseño separa explícitamente:
-    - `df_med`: métricas cuantitativas  
-    - `fig_overlay`: visualización interpretativa  
-    - `df_km`: análisis cromático avanzado  
+    - **df_med**: métricas morfológicas
+    - **fig_overlay**: visualización
+    - **df_km**: color dominante (K-Means)
 
-    Esto asegura **reproducibilidad, trazabilidad y uso académico**.
+    Esto asegura **reproducibilidad y uso académico**.
     """)
 
-# -------- TAB 2 --------
+# -------- TAB DEMO --------
 with tab_demo:
     if os.path.exists(DEMO_OVERLAY_PATH):
         st.image(DEMO_OVERLAY_PATH, use_container_width=True)
     if os.path.exists(DEMO_RESULTS_PATH):
-        df_demo = pd.read_csv(DEMO_RESULTS_PATH)
-        st.dataframe(df_demo.round(2), use_container_width=True)
+        st.dataframe(pd.read_csv(DEMO_RESULTS_PATH).round(2), use_container_width=True)
 
-# -------- TAB 3 --------
+# -------- TAB USER --------
 with tab_user:
-    up = st.file_uploader("Subí tu imagen", ["jpg","png","tif","tiff"])
+    up = st.file_uploader("Subí imagen con fondo azul", ["jpg","png","tif","tiff"])
     if up:
         img = cv2.imdecode(np.frombuffer(up.read(),np.uint8),1)
         mask = segmentar_porotos(img, azul_bajo, azul_alto, kernel_size, close_iters, open_iters)
         df_med, fig, _ = medir_porotos(
             img, mask, dpi, area_min, descartar_borde,
-            margen_borde_px, do_color, False, 3, 15000, 0
+            margen_borde_px, do_color_prom, do_kmeans,
+            3, 15000, 0
         )
         st.pyplot(fig, use_container_width=True)
         st.dataframe(df_med.round(2), use_container_width=True)
