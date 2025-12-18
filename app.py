@@ -23,16 +23,21 @@ from skimage.measure import label, regionprops
 st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
 
 # Crear columnas: título a la izquierda, logos a la derecha
-col_title, col_logos = st.columns([3, 1])
+col_title, col_logos = st.columns([3, 2])
 
 with col_title:
-    st.title("🌱 Análisis morfológico de porotos")
+    st.title("🌱 Herramienta para el análisis morfológico de porotos")
+    st.markdown("Selecciona el modo de operación. El análisis en tiempo real segmenta, mide y calcula color por poroto.")
 
 with col_logos:
-    # Logos institucionales más pequeños
-    st.image("data/logo_utec.png", caption="UTEC", width=80)
-    st.image("data/logo_aria.png", caption="Grupo ARIA", width=80)
-    st.image("data/logo_gasma.jpg", caption="Grupo GASMA", width=80)
+    # Logos en fila horizontal y más pequeños
+    logo_cols = st.columns(3)
+    with logo_cols[0]:
+        st.image("data/logo_utec.png", width=70)
+    with logo_cols[1]:
+        st.image("data/logo_aria.png", width=70)
+    with logo_cols[2]:
+        st.image("data/logo_gasma.jpg", width=70)
 
 # -----------------------------
 # Rutas de Archivos de Demostración
