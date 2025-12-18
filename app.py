@@ -275,8 +275,7 @@ up = None
 # PESTAÑA 1: RESULTADOS DE EJEMPLO DE COLAB
 # -------------------------------------------
 with tab1:
-        st.header("ℹ️ Información de la Herramienta")
-
+    st.header("ℹ️ Información de la Herramienta")
     st.markdown("""
     Esta herramienta realiza **análisis morfológico y de color en porotos** a partir de imágenes
     capturadas con escáner. Fue desarrollada en el marco de una **Beca de Iniciación a la Investigación**
