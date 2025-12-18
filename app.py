@@ -20,9 +20,19 @@ from skimage.measure import label, regionprops
 # -----------------------------
 # Config general de la página
 # -----------------------------
-st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
-st.title("🌱 Análisis morfológico de porotos")
-st.markdown("Selecciona el modo de operación. El análisis en tiempo real segmenta, mide y calcula color por poroto.")
+   st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
+
+# Crear columnas: título a la izquierda, logos a la derecha
+col_title, col_logos = st.columns([3, 1])
+
+with col_title:
+    st.title("🌱 Análisis morfológico de porotos")
+
+with col_logos:
+    # Logos institucionales más pequeños
+    st.image("data/logo_utec.png", caption="UTEC", width=80)
+    st.image("data/logo_aria.png", caption="Grupo ARIA", width=80)
+    st.image("data/logo_gasma.jpg", caption="Grupo GASMA", width=80)
 
 # -----------------------------
 # Rutas de Archivos de Demostración
@@ -283,15 +293,6 @@ with tab1:
     bajo la tutoría de **Nelcy Atehortua, Daniel Boeno y Natalia De Almeida**, en conjunto con los grupos
     de investigación **ARIA** y **GASMA**.
     """)
-
-    # Logos institucionales
-    col_logo1, col_logo2, col_logo3 = st.columns([1,1,1])
-    with col_logo1:
-        st.image("data/logo_utec.png", caption="UTEC", use_column_width=True)
-    with col_logo2:
-        st.image("data/logo_aria.png", caption="Grupo ARIA", use_column_width=True)
-    with col_logo3:
-        st.image("data/logo_gasma.jpg", caption="Grupo GASMA", use_column_width=True)
 
     st.subheader("📖 Instructivo de uso")
     st.markdown("""
