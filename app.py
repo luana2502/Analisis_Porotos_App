@@ -22,22 +22,20 @@ from skimage.measure import label, regionprops
 # -----------------------------
 st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
 
-# Crear columnas: título a la izquierda, logos a la derecha
-col_title, col_logos = st.columns([3, 2])
-
-with col_title:
-    st.title("🌱 Herramienta para el análisis morfológico de porotos")
-    st.markdown("Selecciona el modo de operación. El análisis en tiempo real segmenta, mide y calcula color por poroto.")
-
-with col_logos:
-    # Logos en fila horizontal y más pequeños
-    logo_cols = st.columns(3)
-    with logo_cols[0]:
-        st.image("data/logo_utec.png", width=60)
-    with logo_cols[1]:
-        st.image("data/logo_aria.png", width=65)
-    with logo_cols[2]:
-        st.image("data/logo_gasma.jpg", width=70)
+# Encabezado: título a la izquierda, logos a la derecha
+st.markdown("""
+<div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:0.5rem;">
+  <div style="flex:1 1 auto;">
+    <h1 style="margin:0; font-size:2rem;">🌱 Herramienta para el análisis morfológico de porotos</h1>
+    <p style="margin:0.25rem 0 0 0;">Selecciona el modo de operación. El análisis en tiempo real segmenta, mide y calcula color por poroto.</p>
+  </div>
+  <div style="flex:0 0 auto; display:flex; align-items:center; gap:12px;">
+    <img src="data/logo_utec.png"  alt="UTEC"  style="height:36px; object-fit:contain;"/>
+    <img src="data/logo_aria.png"  alt="ARIA"  style="height:36px; object-fit:contain;"/>
+    <img src="data/logo_gasma.jpg" alt="GASMA" style="height:36px; object-fit:contain;"/>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # -----------------------------
 # Rutas de Archivos de Demostración
