@@ -20,7 +20,7 @@ from skimage.measure import label, regionprops
 # -----------------------------
 # Config general de la página
 # -----------------------------
-   st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
+st.set_page_config(page_title="Análisis morfológico de porotos", layout="wide")
 
 # Crear columnas: título a la izquierda, logos a la derecha
 col_title, col_logos = st.columns([3, 1])
