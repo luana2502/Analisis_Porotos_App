@@ -266,7 +266,7 @@ k_sample_max  = st.sidebar.number_input("Muestreo máx. (pix por poroto)", 1000,
 # ===========================================
 # 1) MODO DE OPERACIÓN (Demo vs. Usuario)
 # ===========================================
-tab1, tab2 = st.tabs(["📊 1. Resultados de Colab (Demo)", "👆 2. Subir Mi Propia Imagen"])
+tab1, tab2 = st.tabs(["📊 1. Instructivo de la herramienta", "👆 2. Subir Mi Propia Imagen"])
 
 # Inicializa 'up' a None. Se redefinirá en tab2 si el usuario interactúa.
 up = None 
@@ -275,6 +275,47 @@ up = None
 # PESTAÑA 1: RESULTADOS DE EJEMPLO DE COLAB
 # -------------------------------------------
 with tab1:
+        st.header("ℹ️ Información de la Herramienta")
+
+    st.markdown("""
+    Esta herramienta realiza **análisis morfológico y de color en porotos** a partir de imágenes
+    capturadas con escáner. Fue desarrollada en el marco de una **Beca de Iniciación a la Investigación**
+    financiada por la **Dirección de Investigación y Desarrollo de la Universidad Tecnológica del Uruguay (UTEC)**,
+    bajo la tutoría de **Nelcy Atehortua, Daniel Boeno y Natalia De Almeida**, en conjunto con los grupos
+    de investigación **ARIA** y **GASMA**.
+    """)
+
+    # Logos institucionales
+    col_logo1, col_logo2, col_logo3 = st.columns([1,1,1])
+    with col_logo1:
+        st.image("data/logo_utec.png", caption="UTEC", use_column_width=True)
+    with col_logo2:
+        st.image("data/logo_aria.png", caption="Grupo ARIA", use_column_width=True)
+    with col_logo3:
+        st.image("data/logo_gasma.jpg", caption="Grupo GASMA", use_column_width=True)
+
+    st.subheader("📖 Instructivo de uso")
+    st.markdown("""
+    - La herramienta **solo funciona con imágenes capturadas mediante el escáner Epson Perfection V850 PRO**,
+      utilizando un **fondo azul uniforme**.
+    - Para analizar tus imágenes, ve a la pestaña *Subir Mi Propia Imagen* y carga un archivo en formato JPG/PNG/TIF.
+    - El procesamiento segmenta cada poroto, calcula medidas geométricas (área, perímetro, ejes, circularidad)
+      y extrae información de color promedio o mediante K-Means.
+    """)
+
+    st.subheader("⚙️ Parámetros de la barra lateral")
+    st.markdown("""
+    - **DPI (escáner):** resolución usada para convertir píxeles a milímetros.
+    - **Área mínima (px²):** descarta objetos demasiado pequeños (ruido).
+    - **Excluir objetos cerca del borde:** evita falsos positivos pegados al marco.
+    - **Margen de borde (px):** define la franja que se ignora en los bordes.
+    - **Segmentación (HSV):** ajusta los rangos de color azul para separar fondo y porotos.
+    - **Morfología (Kernel, Cierre, Apertura):** operaciones para limpiar la máscara y eliminar ruido.
+    - **Color promedio:** calcula el color medio de cada poroto en RGB/HSV.
+    - **K-Means:** agrupa colores dominantes dentro de cada poroto (requiere más tiempo de cómputo).
+    """)
+
+    st.markdown("---")
     st.header("Resultados de la Investigación de Ejemplo")
     st.markdown("Estos son los datos e imágenes generados en Google Colab para demostrar el *pipeline* completo. Puedes explorar las medidas y visualizaciones finales.")
     
