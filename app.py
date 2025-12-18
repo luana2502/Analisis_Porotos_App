@@ -33,9 +33,9 @@ with col_logos:
     # Logos en fila horizontal y más pequeños
     logo_cols = st.columns(3)
     with logo_cols[0]:
-        st.image("data/logo_utec.png", width=70)
+        st.image("data/logo_utec.png", width=60)
     with logo_cols[1]:
-        st.image("data/logo_aria.png", width=70)
+        st.image("data/logo_aria.png", width=65)
     with logo_cols[2]:
         st.image("data/logo_gasma.jpg", width=70)
 
