@@ -290,11 +290,11 @@ up = None
 with tab1:
     st.header("ℹ️ Información de la Herramienta")
     st.markdown("""
-    Esta herramienta realiza **análisis morfológico y de color en porotos** a partir de imágenes
-    capturadas con escáner. Fue desarrollada en el marco de una **Beca de Iniciación a la Investigación**
+    Esta herramienta realiza **análisis morfológico en porotos** a partir de imágenes
+    capturadas con escáner. Fue desarrollada por Luana Frías-Telesca en el marco de una **Beca de Iniciación a la Investigación**
     financiada por la **Dirección de Investigación y Desarrollo de la Universidad Tecnológica del Uruguay (UTEC)**,
-    bajo la tutoría de **Nelcy Atehortua, Daniel Boeno y Natalia De Almeida**, en conjunto con los grupos
-    de investigación **ARIA** y **GASMA**.
+    bajo la tutoría de **Nelcy Atehortua, Daniel Boeno y Natalia De Almeida**, en conjunto con el 
+    **Grupo de investigación en Aplicaciones en Inteligencia Artificial (ARIA)** y  el **Grupo de Agroecología y Medio Ambiente (GASMA)**.
     """)
 
     st.subheader("📖 Instructivo de uso")
@@ -308,14 +308,14 @@ with tab1:
 
     st.subheader("⚙️ Parámetros de la barra lateral")
     st.markdown("""
-    - **DPI (escáner):** resolución usada para convertir píxeles a milímetros.
-    - **Área mínima (px²):** descarta objetos demasiado pequeños (ruido).
+    - **DPI (escáner):** Define la resolución espacial utilizada para convertir las medidas en píxeles a unidades métricas (milímetros). En esta beca, las imágenes fueron adquiridas mediante un escáner plano con una resolución de 800 DPI. Este valor es importante para que el área, el perímetro y los ejes calculados reflejen dimensiones físicas reales del poroto.
+    - **Área mínima (px²):** Establece un umbral inferior de tamaño para descartar objetos pequeños que no corresponden a semillas (ruido, polvo, imperfecciones del escaneo). Ajustar este parámetro permite mejorar la robustez del conteo y de las métricas morfológicas.
     - **Excluir objetos cerca del borde:** evita falsos positivos pegados al marco.
-    - **Margen de borde (px):** define la franja que se ignora en los bordes.
-    - **Segmentación (HSV):** ajusta los rangos de color azul para separar fondo y porotos.
+    - **Margen de borde (px):** Define el ancho de la franja perimetral de la imagen que se ignora durante el análisis. Todo objeto cuya caja delimitadora intersecte esta zona es descartado automáticamente, reduciendo falsos positivos asociados a reflejos o recortes incompletos.
+    - **Segmentación (HSV):** Permite ajustar los rangos de tono (H), saturación (S) y valor (V) correspondientes al fondo azul del escaneo, separándolo de los porotos. El uso del espacio HSV mejora la estabilidad de la segmentación frente a variaciones de iluminación y color.
     - **Morfología (Kernel, Cierre, Apertura):** operaciones para limpiar la máscara y eliminar ruido.
     - **Color promedio:** calcula el color medio de cada poroto en RGB/HSV.
-    - **K-Means:** agrupa colores dominantes dentro de cada poroto (requiere más tiempo de cómputo).
+    - **K-Means:** agrupa colores dominantes dentro de cada poroto.
     """)
 
     st.markdown("---")
